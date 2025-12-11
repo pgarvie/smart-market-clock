@@ -5,7 +5,6 @@ import time
 from collections import OrderedDict
 
 # --- Configuration de la Page Streamlit ---
-# Doit être la première commande Streamlit
 st.set_page_config(
     page_title="SMART Market Clock",
     page_icon="🕰️",
@@ -14,7 +13,6 @@ st.set_page_config(
 
 # --- Configuration des Fuseaux Horaires ---
 
-# Rangée 1 : Marchés Mondiaux (Ordonnés d'Ouest en Est)
 global_markets = OrderedDict([
     ('New York', 'America/New_York'),
     ('Toronto', 'America/Toronto'),
@@ -25,7 +23,6 @@ global_markets = OrderedDict([
     ('Sydney', 'Australia/Sydney')
 ])
 
-# Rangée 2 : Fuseaux Horaires Canadiens (Ordonnés d'Ouest en Est)
 canadian_cities = OrderedDict([
     ('Vancouver', 'America/Vancouver'),
     ('Edmonton', 'America/Edmonton'),
@@ -40,62 +37,61 @@ canadian_cities = OrderedDict([
 
 st.title("🕰️ SMART Market Clock")
 
-# Créer un emplacement réservé pour l'horloge UTC
-utc_placeholder = st.empty()
-
-# Créer des colonnes pour les marchés mondiaux
-st.subheader("Marchés Mondiaux")
-global_cols = st.columns(len(global_markets))
-
-# Créer des colonnes pour les villes canadiennes
-st.subheader("Fuseaux Horaires Canadiens")
-canadian_cols = st.columns(len(canadian_cities))
-
-
-def create_clock_card(city, local_now, show_market_status=False):
-    """Génère les informations pour une seule carte d'horloge."""
-    
-    utc_offset_str = local_now.strftime('%z')
-    utc_offset_formatted = f"UTC {utc_offset_str[:3]}:{utc_offset_str[3:]}"
-    
-    status_text = ""
-    status_color = "gray"
-    if show_market_status:
-        hours = {'Tokyo': (9, 15), 'Hong Kong': (9, 15), 'Sydney': (10, 16), 'Francfort': (9, 18), 'Londres': (8, 17), 'New York': (9, 16), 'Toronto': (9, 16)}
-        open_hour, close_hour = hours.get(city, (9, 17))
-        
-        if open_hour <= local_now.hour < close_hour and local_now.weekday() < 5:
-            status_text = '🟢 Ouvert'
-        else:
-            status_text = '🔴 Fermé'
-            
-    return f"""
-        **{city}**\n
-        {local_now.strftime('%Y-%m-%d')}\n
-        ## {local_now.strftime('%H:%M')}\n
-        <small>{utc_offset_formatted}</small>\n
-        {status_text}
-    """
+# Créer un emplacement réservé unique pour toute la page
+placeholder = st.empty()
 
 # --- Boucle Principale ---
 while True:
-    utc_now = datetime.now(pytz.utc)
+    with placeholder.container():
+        utc_now = datetime.now(pytz.utc)
 
-    # Mettre à jour l'horloge UTC
-    with utc_placeholder.container():
+        # Affichage de l'horloge UTC
         st.header(f"{utc_now.strftime('%Y-%m-%d')} - {utc_now.strftime('%H:%M:%S')} UTC")
+        st.divider()
 
-    # Mettre à jour les horloges mondiales
-    for col, (city, tz_name) in zip(global_cols, global_markets.items()):
-        with col:
-            local_now = utc_now.astimezone(pytz.timezone(tz_name))
-            st.markdown(create_clock_card(city, local_now, show_market_status=True), unsafe_allow_html=True)
+        # --- Affichage des Marchés Mondiaux ---
+        st.subheader("Marchés Mondiaux")
+        global_cols = st.columns(len(global_markets))
 
-    # Mettre à jour les horloges canadiennes
-    for col, (city, tz_name) in zip(canadian_cols, canadian_cities.items()):
-        with col:
+        for col, (city, tz_name) in zip(global_cols, global_markets.items()):
             local_now = utc_now.astimezone(pytz.timezone(tz_name))
-            st.markdown(create_clock_card(city, local_now), unsafe_allow_html=True)
             
+            # Calcul du décalage UTC
+            utc_offset_str = local_now.strftime('%z')
+            utc_offset_formatted = f"UTC {utc_offset_str[:3]}:{utc_offset_str[3:]}"
+
+            # Calcul du statut du marché
+            hours = {'Tokyo': (9, 15), 'Hong Kong': (9, 15), 'Sydney': (10, 16), 'Francfort': (9, 18), 'Londres': (8, 17), 'New York': (9, 16), 'Toronto': (9, 16)}
+            open_hour, close_hour = hours.get(city, (9, 17))
+            is_open = open_hour <= local_now.hour < close_hour and local_now.weekday() < 5
+            status_emoji = '🟢' if is_open else '🔴'
+            
+            # Afficher les informations dans la colonne
+            col.metric(
+                label=f"{city} ({local_now.strftime('%Y-%m-%d')})",
+                value=local_now.strftime('%H:%M'),
+                delta=status_emoji
+            )
+            col.write(f"_{utc_offset_formatted}_")
+
+
+        st.divider()
+
+        # --- Affichage des Villes Canadiennes ---
+        st.subheader("Fuseaux Horaires Canadiens")
+        canadian_cols = st.columns(len(canadian_cities))
+        
+        for col, (city, tz_name) in zip(canadian_cols, canadian_cities.items()):
+            local_now = utc_now.astimezone(pytz.timezone(tz_name))
+            
+            utc_offset_str = local_now.strftime('%z')
+            utc_offset_formatted = f"UTC {utc_offset_str[:3]}:{utc_offset_str[3:]}"
+            
+            col.metric(
+                label=f"{city} ({local_now.strftime('%Y-%m-%d')})",
+                value=local_now.strftime('%H:%M')
+            )
+            col.write(f"_{utc_offset_formatted}_")
+
     # Attendre avant la prochaine mise à jour
     time.sleep(1)
